@@ -182,3 +182,6 @@ if ( defined( 'JETPACK__VERSION' ) ) {
 if ( class_exists( 'WooCommerce' ) ) {
 	require get_template_directory() . '/inc/woocommerce.php';
 }
+
+/*******require brewery */
+require get_template_directory() . '/brewery/index.php';
