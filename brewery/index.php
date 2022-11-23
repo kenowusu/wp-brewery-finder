@@ -23,57 +23,106 @@ function get_breweries_from_api(){
 
     */
     $current_page = (!empty($_POST['current_page'])) ? $_POST['current_page'] : 1;
+    
+    //get data from api
+    $results = wp_remote_retrieve_body(wp_remote_get($open_brewery_url . "?page=". $current_page . "&per_page=50"));
+    
+    
 
-    $results = wp_remote_get($open_brewery_url . "?page=". $current_page . "&per_page=10");
-    
-   
-    
+    /******test insert current page into db */
     $file = get_template_directory() . '/brewery/file.txt';
-
     file_put_contents($file,"Current Page: ".$current_page . "\n\n",FILE_APPEND);
 
-    $current_page  = $current_page + 1;
     
+    //decode body(string) of api request  
     $breweries  = json_decode($results);
     
+   
+
+
+
+    // $breweries  = $results;
     /**insert into database */
 
     foreach($breweries as $brewery){
-      /*insert brewery**/
-      $brewery_data = array(
-        'id'=>$brewery->id,
-        'post_name'=>$brewery->id,
-        'post_title'=>$brewery->id,
-        'post_type'=>'brewery',
-        'post_status'=>'published',
-      );
+      /*insert brewery into table **/
 
-      $inserted_id = wp_insert_post($brewery_data);
+      //check to see if post brewery exist in db 
 
-      $fillable = array(
-        'name'=>'field_637d00ef08c10',
-        'brewery_type'=>'field_637d014508c11',
-        'street'=>'field_637d015808c12',
-        'city'=>'field_637d016108c13',
-        'state'=>'field_637d017a08c14',
-        'postal_code'=>'field_637d018708c15',
-        'country'=>'field_637d019408c16',
-        'longitude'=>'field_637d019f08c17',
-        'latitude'=>'field_637d01a808c18',
-        'phone'=>'field_637d01ae08c19',
-        'website_url'=>'field_637d01b308c1a',
-        'updated_at'=>'field_637d01ba08c1b'
-      );
+      $existing_brewery = get_page_by_path( $brewery->id, 'OBJECT', 'brewery');
        
-      /** insert(update) fields added by custom post types*/
-      foreach($fillable as $name => $field_key){
-        update_field($field_key,$brewery->$name,$inserted_id);
-      }
+      /** if brewery does not exists, insert post */
+      if($existing_brewery === null){
+
+        
+      
+        $brewery_data = array(
+          'post_name'=>$brewery->id,
+          'post_title'=>$brewery->id,
+          'post_type'=>'brewery',
+          'post_status'=>'publish',
+        );
+
+        $inserted_id = wp_insert_post($brewery_data);
+
+        $fillable = array(
+          'name'=>'field_637e0eefbcc9a',
+          'brewery_type'=>'field_637e0f43fc5e8',
+          'street'=>'field_637e0f53fc5e9',
+          'city'=>'field_637e0f59fc5ea',
+          'state'=>'field_637e0f65fc5eb',
+          'postal_code'=>'field_637e0f6bfc5ec',
+          'country'=>'field_637e0f77fc5ed',
+          'longitude'=>'field_637e0f8f1c1e1',
+          'latitude'=>'field_637e0f9b1c1e2',
+          'phone'=>'field_637e0fb71c1e3',
+          'website_url'=>'field_637e0fc31c1e4',
+          'updated_at'=>'field_637e0fca1c1e5'
+        );
+        
+        /** insert(update) fields of inserted brewery post type added by acf*/
+        foreach($fillable as $name => $field_key){
+          update_field($field_key,$brewery->$name,$inserted_id);
+        }
     
+    }else{
+      $existing_brewery_id = $existing_brewery->ID;
+      $existing_brewery_timestamp = get_field('updated_at',$existing_brewery_id);
+
+      if($brewery->updated_at >= $existing_brewery_timestamp){
+        // update brewery 
+
+
+        $fillable = array(
+          'name'=>'field_637e0eefbcc9a',
+          'brewery_type'=>'field_637e0f43fc5e8',
+          'street'=>'field_637e0f53fc5e9',
+          'city'=>'field_637e0f59fc5ea',
+          'state'=>'field_637e0f65fc5eb',
+          'postal_code'=>'field_637e0f6bfc5ec',
+          'country'=>'field_637e0f77fc5ed',
+          'longitude'=>'field_637e0f8f1c1e1',
+          'latitude'=>'field_637e0f9b1c1e2',
+          'phone'=>'field_637e0fb71c1e3',
+          'website_url'=>'field_637e0fc31c1e4',
+          'updated_at'=>'field_637e0fca1c1e5'
+        );
+        
+        /** insert(update) fields of inserted brewery post type added by acf*/
+        foreach($fillable as $name => $field_key){
+          update_field($field_key,$brewery->$name,$existing_brewery_id);
+        }
+
+      }
+
     }
 
+  }
+     //increase current_page for next post request 
+     $current_page  = $current_page + 1;
 
-    if(is_array($results)){
+   /************disable infinite loop** */
+    if(is_array($breweries)){
         $ajax_url = "admin-ajax.php?action=get_breweries_from_api";
         $request_array = array(
           'blocking'=>false,
@@ -83,7 +132,7 @@ function get_breweries_from_api(){
           )
         );
 
-        // wp_send_json_success( $request_array ,200);
+        
 
         //let function call itself until there is no more data from api
         wp_remote_post(admin_url($ajax_url),$request_array);
